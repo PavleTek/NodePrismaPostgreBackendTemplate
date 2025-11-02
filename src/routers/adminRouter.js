@@ -1,0 +1,39 @@
+const express = require('express');
+const { 
+  getAllUsers, 
+  getUserById, 
+  createUser, 
+  updateUser, 
+  changeUserPassword, 
+  changeUserRoles, 
+  deleteUser,
+  getAllRoles,
+  createRole,
+  updateRole,
+  deleteRole
+} = require('../controllers/adminController');
+const { authenticateToken, authenticateRoles } = require('../middleware/authentication');
+
+const router = express.Router();
+
+// All admin routes require authentication and admin role
+router.use(authenticateToken);
+router.use(authenticateRoles(['admin']));
+
+// User management routes
+router.get('/users', getAllUsers);
+router.get('/users/:id', getUserById);
+router.post('/users', createUser);
+router.put('/users/:id', updateUser);
+router.put('/users/:id/password', changeUserPassword);
+router.put('/users/:id/roles', changeUserRoles);
+router.delete('/users/:id', deleteUser);
+
+// Role management routes
+router.get('/roles', getAllRoles);
+router.post('/roles', createRole);
+router.put('/roles/:id', updateRole);
+router.delete('/roles/:id', deleteRole);
+
+module.exports = router;
+
