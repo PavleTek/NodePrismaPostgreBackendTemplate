@@ -8,6 +8,7 @@ const {
   sendTestEmail,
 } = require('../controllers/emailController');
 const { authenticateToken, authenticateRoles } = require('../middleware/authentication');
+const upload = require('../middleware/upload');
 
 const router = express.Router();
 
@@ -22,8 +23,8 @@ router.post('/emails', createEmail);
 router.put('/emails/:id', updateEmail);
 router.delete('/emails/:id', deleteEmail);
 
-// Test email route
-router.post('/emails/test', sendTestEmail);
+// Test email route with file upload support
+router.post('/emails/test', upload.array('attachments', 10), sendTestEmail);
 
 module.exports = router;
 

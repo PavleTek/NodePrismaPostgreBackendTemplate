@@ -36,17 +36,21 @@ npm run dev
 
 ### Email Configuration
 
+The email system uses OAuth2 refresh tokens stored per email sender in the database. Each email sender must have a refresh token configured.
+
+#### Required Environment Variables
+
 #### Gmail
-- `GMAIL_CLIENT_ID`: Gmail OAuth2 client ID (optional, for OAuth2)
-- `GMAIL_CLIENT_SECRET`: Gmail OAuth2 client secret (optional, for OAuth2)
-- `GMAIL_REFRESH_TOKEN`: Gmail OAuth2 refresh token (optional, for OAuth2)
-- `GMAIL_APP_PASSWORD`: Gmail app password (alternative to OAuth2)
+- `GMAIL_CLIENT_ID`: Gmail OAuth2 client ID (required)
+- `GMAIL_CLIENT_SECRET`: Gmail OAuth2 client secret (required)
 
 #### Outlook
-- `OUTLOOK_CLIENT_ID`: Outlook OAuth2 client ID (optional, for OAuth2)
-- `OUTLOOK_CLIENT_SECRET`: Outlook OAuth2 client secret (optional, for OAuth2)
-- `OUTLOOK_REFRESH_TOKEN`: Outlook OAuth2 refresh token (optional, for OAuth2)
-- `OUTLOOK_APP_PASSWORD`: Outlook app password (recommended)
+- `OUTLOOK_CLIENT_ID`: Outlook OAuth2 client ID (required)
+- `OUTLOOK_CLIENT_SECRET`: Outlook OAuth2 client secret (required)
 
-**Note**: For Gmail, you can use either OAuth2 credentials or an App Password. For Outlook, App Password is recommended. Make sure to add email senders through the App Settings page in the frontend before sending emails.
+**Note**: 
+- Refresh tokens are stored per email sender in the database and must be added when creating or updating an email sender through the App Settings page in the frontend.
+- Each email sender can have its own refresh token, allowing multiple email accounts to send emails.
+- The refresh token is required when sending emails - if missing, an error will be thrown.
+- Make sure to add email senders and their refresh tokens through the App Settings page before sending emails.
 

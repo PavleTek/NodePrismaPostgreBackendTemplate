@@ -5,8 +5,13 @@ const prisma = require("../lib/prisma");
 
 /**
  * Get OAuth2 access token for Gmail
+ * @param {string} refreshToken - Gmail refresh token from database
  */
-async function getGmailAccessToken() {
+async function getGmailAccessToken(refreshToken) {
+  if (!refreshToken) {
+    throw new Error("Gmail refresh token is required");
+  }
+
   const oauth2Client = new google.auth.OAuth2(
     process.env.GMAIL_CLIENT_ID,
     process.env.GMAIL_CLIENT_SECRET,
@@ -14,7 +19,7 @@ async function getGmailAccessToken() {
   );
 
   oauth2Client.setCredentials({
-    refresh_token: process.env.GMAIL_REFRESH_TOKEN,
+    refresh_token: refreshToken,
   });
 
   const { credentials } = await oauth2Client.refreshAccessToken();
@@ -23,95 +28,61 @@ async function getGmailAccessToken() {
 
 /**
  * Get OAuth2 access token for Outlook
+ * @param {string} refreshToken - Outlook refresh token from database
  */
-async function getOutlookAccessToken() {
-  const msalConfig = {
-    auth: {
-      clientId: process.env.OUTLOOK_CLIENT_ID,
-      clientSecret: process.env.OUTLOOK_CLIENT_SECRET,
-      authority: "https://login.microsoftonline.com/common",
-    },
-  };
-
-  const cca = new ConfidentialClientApplication(msalConfig);
-  const tokenRequest = {
-    scopes: ["https://graph.microsoft.com/.default"],
-    grantType: "client_credentials",
-  };
-
-  // For Outlook, we'll use client credentials flow
-  // But for sending emails, we need user delegated permissions
-  // This is a simplified version - in production, you'd want to use refresh tokens
-  try {
-    const response = await cca.acquireTokenByClientCredential({
-      scopes: ["https://graph.microsoft.com/.default"],
-    });
-    return response.accessToken;
-  } catch (error) {
-    // Fallback to using refresh token if available
-    if (process.env.OUTLOOK_REFRESH_TOKEN) {
-      // In a real implementation, you'd exchange the refresh token for a new access token
-      // This is a placeholder - you may need to implement token refresh logic
-      throw new Error(
-        "Outlook OAuth2 refresh token flow not fully implemented. Consider using App Password instead."
-      );
-    }
-    throw error;
+async function getOutlookAccessToken(refreshToken) {
+  if (!refreshToken) {
+    throw new Error("Outlook refresh token is required");
   }
+
+  // Note: Outlook OAuth2 refresh token flow requires additional implementation
+  // This is a placeholder - you may need to implement token refresh logic using
+  // Microsoft Graph API or Azure AD token endpoint
+  // For now, we'll use SMTP with OAuth2, which requires the refresh token
+  // to be exchanged for an access token via Microsoft's token endpoint
+  
+  // TODO: Implement proper Outlook refresh token exchange
+  // This typically involves calling:
+  // POST https://login.microsoftonline.com/common/oauth2/v2.0/token
+  // with grant_type=refresh_token, client_id, client_secret, and refresh_token
+  
+  throw new Error(
+    "Outlook OAuth2 refresh token flow needs to be implemented. For now, use SMTP with OAuth2 access tokens."
+  );
 }
 
 /**
  * Send email via Gmail
  */
 async function sendViaGmail(options) {
-  const { fromEmail, toEmails, ccEmails, bccEmails, subject, content, isHtml } =
+  const { fromEmail, toEmails, ccEmails, bccEmails, subject, content, isHtml, attachments, refreshToken } =
     options;
 
-  let transporter;
-  console.log()
-
-  // Try OAuth2 first if credentials are available
-  if (
-    process.env.GMAIL_CLIENT_ID &&
-    process.env.GMAIL_CLIENT_SECRET &&
-    process.env.GMAIL_REFRESH_TOKEN
-  ) {
-    try {
-      console.log("trying to use the oauth2 shit");
-      const accessToken = await getGmailAccessToken();
-      transporter = nodemailer.createTransport({
-        service: "gmail",
-        auth: {
-          type: "OAuth2",
-          user: fromEmail,
-          clientId: process.env.GMAIL_CLIENT_ID,
-          clientSecret: process.env.GMAIL_CLIENT_SECRET,
-          refreshToken: process.env.GMAIL_REFRESH_TOKEN,
-          accessToken: accessToken,
-        },
-      });
-    } catch (error) {
-      console.error("Gmail OAuth2 failed, trying app password:", error);
-      // Fall through to app password
-    }
-  }
-
-  // Fallback to App Password if OAuth2 failed or not configured
-  if (!transporter && process.env.GMAIL_APP_PASSWORD) {
-    transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: fromEmail,
-        pass: process.env.GMAIL_APP_PASSWORD,
-      },
-    });
-  }
-
-  if (!transporter) {
+  if (!refreshToken) {
     throw new Error(
-      "Gmail credentials not configured. Please set GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, or GMAIL_APP_PASSWORD in .env"
+      "Gmail refresh token is required. Please add a refresh token to the email sender configuration."
     );
   }
+
+  if (!process.env.GMAIL_CLIENT_ID || !process.env.GMAIL_CLIENT_SECRET) {
+    throw new Error(
+      "Gmail OAuth2 credentials not configured. Please set GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET in .env"
+    );
+  }
+
+  const accessToken = await getGmailAccessToken(refreshToken);
+  
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      type: "OAuth2",
+      user: fromEmail,
+      clientId: process.env.GMAIL_CLIENT_ID,
+      clientSecret: process.env.GMAIL_CLIENT_SECRET,
+      refreshToken: refreshToken,
+      accessToken: accessToken,
+    },
+  });
 
   const mailOptions = {
     from: fromEmail,
@@ -121,6 +92,7 @@ async function sendViaGmail(options) {
       bccEmails && Array.isArray(bccEmails) ? bccEmails.join(", ") : bccEmails,
     subject: subject,
     [isHtml ? "html" : "text"]: content,
+    attachments: attachments || [],
   };
 
   const info = await transporter.sendMail(mailOptions);
@@ -131,54 +103,27 @@ async function sendViaGmail(options) {
  * Send email via Outlook
  */
 async function sendViaOutlook(options) {
-  const { fromEmail, toEmails, ccEmails, bccEmails, subject, content, isHtml } =
+  const { fromEmail, toEmails, ccEmails, bccEmails, subject, content, isHtml, attachments, refreshToken } =
     options;
 
-  let transporter;
-
-  // Try OAuth2 first if credentials are available
-  if (process.env.OUTLOOK_CLIENT_ID && process.env.OUTLOOK_CLIENT_SECRET) {
-    try {
-      // For Outlook, OAuth2 is more complex and typically requires user interaction
-      // For template purposes, we'll use SMTP with App Password as the primary method
-      // OAuth2 can be implemented later if needed
-    } catch (error) {
-      console.error("Outlook OAuth2 setup error:", error);
-    }
-  }
-
-  // Use SMTP with App Password (recommended for Outlook)
-  if (process.env.OUTLOOK_APP_PASSWORD) {
-    transporter = nodemailer.createTransport({
-      host: "smtp.office365.com",
-      port: 587,
-      secure: false,
-      auth: {
-        user: fromEmail,
-        pass: process.env.OUTLOOK_APP_PASSWORD,
-      },
-      tls: {
-        ciphers: "SSLv3",
-      },
-    });
-  } else {
+  if (!refreshToken) {
     throw new Error(
-      "Outlook credentials not configured. Please set OUTLOOK_APP_PASSWORD in .env"
+      "Outlook refresh token is required. Please add a refresh token to the email sender configuration."
     );
   }
 
-  const mailOptions = {
-    from: fromEmail,
-    to: Array.isArray(toEmails) ? toEmails.join(", ") : toEmails,
-    cc: ccEmails && Array.isArray(ccEmails) ? ccEmails.join(", ") : ccEmails,
-    bcc:
-      bccEmails && Array.isArray(bccEmails) ? bccEmails.join(", ") : bccEmails,
-    subject: subject,
-    [isHtml ? "html" : "text"]: content,
-  };
-
-  const info = await transporter.sendMail(mailOptions);
-  return info;
+  // For Outlook, we'll use SMTP with OAuth2
+  // Note: This requires getting an access token from the refresh token
+  // For now, we'll use a simplified approach - in production, you may need
+  // to implement proper token refresh using Microsoft Graph API
+  
+  // TODO: Implement proper Outlook OAuth2 token refresh
+  // For now, using SMTP with basic auth is not supported without app passwords
+  // Outlook OAuth2 requires access token generation from refresh token
+  
+  throw new Error(
+    "Outlook OAuth2 implementation requires access token refresh. Please implement token refresh logic using Microsoft Graph API or Azure AD token endpoint."
+  );
 }
 
 /**
@@ -191,6 +136,7 @@ async function sendViaOutlook(options) {
  * @param {string} options.subject - Email subject
  * @param {string} options.content - Email content (text or HTML)
  * @param {boolean} [options.isHtml=false] - Whether content is HTML
+ * @param {Array} [options.attachments] - Email attachments array
  * @returns {Promise} - Email send result
  */
 async function sendEmail(options) {
@@ -202,21 +148,44 @@ async function sendEmail(options) {
     );
   }
 
-  // Get the email sender from database to determine provider
-  const emailSender = await prisma.emailSender.findUnique({
-    where: { email: fromEmail.toLowerCase().trim() },
+  // Normalize the fromEmail for lookup
+  const normalizedFromEmail = fromEmail.toLowerCase().trim();
+
+  // Try to find email sender by main email first
+  let emailSender = await prisma.emailSender.findUnique({
+    where: { email: normalizedFromEmail },
   });
+
+  // If not found by main email, search for it in aliases
+  if (!emailSender) {
+    const allEmailSenders = await prisma.emailSender.findMany();
+    emailSender = allEmailSenders.find((sender) => {
+      // Check if the fromEmail matches any alias
+      return sender.aliases && sender.aliases.some(
+        (alias) => alias.toLowerCase().trim() === normalizedFromEmail
+      );
+    });
+  }
 
   if (!emailSender) {
     throw new Error(
-      `Email sender ${fromEmail} not found in database. Please add it first.`
+      `Email sender ${fromEmail} not found in database. Please add it first or ensure the alias is configured.`
     );
   }
 
-  // Use the normalized email from database for sending
+  // Check if refresh token is present
+  if (!emailSender.refreshToken) {
+    throw new Error(
+      `Email sender ${emailSender.email} is missing a refresh token. Please add a refresh token to the email sender configuration.`
+    );
+  }
+
+  // Use the provided fromEmail (which could be an alias) for sending
+  // But use the main email's refresh token for OAuth authentication
   const normalizedOptions = {
     ...options,
-    fromEmail: emailSender.email,
+    fromEmail: normalizedFromEmail, // Use the alias or main email as provided
+    refreshToken: emailSender.refreshToken, // Use main email's refresh token
   };
 
   // Route to appropriate provider function
