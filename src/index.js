@@ -9,21 +9,28 @@ const emailRouter = require("./routers/emailRouter")
 dotenv.config()
 const app = express()
 
-// Allow all origins temporarily (for testing)
-app.use(cors())
+// CORS setup — must be FIRST
+const corsOptions = {
+  origin: process.env.CORS_ORIGIN || "*",  // temporarily allow all if env missing
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  optionsSuccessStatus: 204
+}
+
+app.use(cors(corsOptions))
 app.use(express.json())
 
-// Log every request
+// Log every request (optional)
 app.use((req, res, next) => {
   console.log("--- Incoming Request ---")
   console.log("Method:", req.method)
   console.log("URL:", req.originalUrl)
   console.log("Origin:", req.headers.origin)
-  console.log("-------------------------")
   next()
 })
 
-// Routes
+// Routers after CORS
 app.use("/api/auth", authRouter)
 app.use("/api/admin", adminRouter)
 app.use("/api/admin", emailRouter)
