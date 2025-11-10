@@ -1,10 +1,10 @@
 // TEMPORARY: allow every origin
-import express from "express"
-import cors from "cors"
-import dotenv from "dotenv"
-import authRouter from "./routers/authRouter.js"
-import adminRouter from "./routers/adminRouter.js"
-import emailRouter from "./routers/emailRouter.js"
+const express = require("express")
+const cors = require("cors")
+const dotenv = require("dotenv")
+const authRouter = require("./routers/authRouter")
+const adminRouter = require("./routers/adminRouter")
+const emailRouter = require("./routers/emailRouter")
 
 dotenv.config()
 const app = express()
