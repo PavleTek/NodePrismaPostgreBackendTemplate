@@ -1,7 +1,7 @@
-// TEMPORARY: allow every origin
 const express = require("express")
 const cors = require("cors")
 const dotenv = require("dotenv")
+
 const authRouter = require("./routers/authRouter")
 const adminRouter = require("./routers/adminRouter")
 const emailRouter = require("./routers/emailRouter")
@@ -9,18 +9,21 @@ const emailRouter = require("./routers/emailRouter")
 dotenv.config()
 const app = express()
 
-app.use(cors())                // <— universal CORS
-app.options("*", cors())       // <— universal preflight
+// Allow all origins temporarily (for testing)
+app.use(cors())
 app.use(express.json())
 
+// Log every request
 app.use((req, res, next) => {
   console.log("--- Incoming Request ---")
   console.log("Method:", req.method)
   console.log("URL:", req.originalUrl)
   console.log("Origin:", req.headers.origin)
+  console.log("-------------------------")
   next()
 })
 
+// Routes
 app.use("/api/auth", authRouter)
 app.use("/api/admin", adminRouter)
 app.use("/api/admin", emailRouter)
