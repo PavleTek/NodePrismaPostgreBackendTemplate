@@ -365,27 +365,34 @@ const deleteEmail = async (req, res) => {
   }
 };
 
-// Send test email
+// Send test email (debug version)
 const sendTestEmail = async (req, res) => {
+  console.log("📩 [sendTestEmail] Request received");
+  console.log("Headers:", req.headers);
+  console.log("Body:", req.body);
+  console.log("Files:", req.files);
+
   try {
     const { fromEmail, toEmails, ccEmails, bccEmails, subject, content } = req.body;
 
     if (!fromEmail || !toEmails || !subject || !content) {
+      console.warn("⚠️ Missing required fields", { fromEmail, toEmails, subject, content });
       res.status(400).json({ error: 'fromEmail, toEmails, subject, and content are required' });
       return;
     }
 
-    // Parse email arrays from JSON strings if needed (multer sends form fields as strings)
     const parseEmailArray = (emails) => {
       if (!emails) return [];
       if (Array.isArray(emails)) return emails;
       if (typeof emails === 'string') {
         try {
           const parsed = JSON.parse(emails);
+          console.log("✅ Parsed JSON emails for", emails, "=>", parsed);
           return Array.isArray(parsed) ? parsed : [parsed];
         } catch {
-          // If not JSON, treat as comma-separated string
-          return emails.split(',').map(e => e.trim()).filter(e => e);
+          const split = emails.split(',').map(e => e.trim()).filter(e => e);
+          console.log("✅ Parsed comma-separated emails for", emails, "=>", split);
+          return split;
         }
       }
       return [];
@@ -395,16 +402,22 @@ const sendTestEmail = async (req, res) => {
     const ccEmailsArray = parseEmailArray(ccEmails);
     const bccEmailsArray = parseEmailArray(bccEmails);
 
-    // Validate at least one recipient
+    console.log("Parsed recipients:", {
+      toEmailsArray,
+      ccEmailsArray,
+      bccEmailsArray
+    });
+
     if (toEmailsArray.length === 0) {
+      console.warn("⚠️ No recipients found");
       res.status(400).json({ error: 'At least one recipient email is required' });
       return;
     }
 
-    // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    
+
     if (!emailRegex.test(fromEmail)) {
+      console.warn("⚠️ Invalid fromEmail:", fromEmail);
       res.status(400).json({ error: 'Invalid fromEmail format' });
       return;
     }
@@ -412,6 +425,7 @@ const sendTestEmail = async (req, res) => {
     const validateEmailArray = (emails, fieldName) => {
       for (const email of emails) {
         if (!emailRegex.test(email)) {
+          console.warn(`⚠️ Invalid email format in ${fieldName}:`, email);
           res.status(400).json({ error: `Invalid email format in ${fieldName}: ${email}` });
           return false;
         }
@@ -423,16 +437,19 @@ const sendTestEmail = async (req, res) => {
     if (ccEmailsArray.length > 0 && !validateEmailArray(ccEmailsArray, 'ccEmails')) return;
     if (bccEmailsArray.length > 0 && !validateEmailArray(bccEmailsArray, 'bccEmails')) return;
 
-    // Process attachments from multer
     const attachments = [];
     if (req.files && req.files.length > 0) {
+      console.log("📎 Processing attachments...");
       for (const file of req.files) {
+        console.log(" - Found file:", file.originalname, file.mimetype, file.size);
         attachments.push({
           filename: file.originalname,
           content: file.buffer,
           contentType: file.mimetype,
         });
       }
+    } else {
+      console.log("📎 No attachments found");
     }
 
     const emailOptions = {
@@ -442,21 +459,30 @@ const sendTestEmail = async (req, res) => {
       bccEmails: bccEmailsArray.length > 0 ? bccEmailsArray.map(e => e.toLowerCase().trim()) : undefined,
       subject: subject,
       content: content,
-      isHtml: false, // Default to plain text, can be made configurable
+      isHtml: false,
       attachments: attachments.length > 0 ? attachments : undefined,
     };
 
+    console.log("📨 Sending email with options:", emailOptions);
+
     const result = await sendEmail(emailOptions);
+
+    console.log("✅ Email sent successfully. Result:", result);
 
     res.status(200).json({
       message: 'Test email sent successfully',
       messageId: result.messageId,
     });
   } catch (error) {
-    console.error('Send test email error:', error);
+    console.error("💥 Send test email error:", {
+      message: error.message,
+      stack: error.stack,
+      cause: error.cause
+    });
     res.status(500).json({ error: error.message || 'Failed to send test email' });
   }
 };
+
 
 module.exports = {
   getAllEmails,

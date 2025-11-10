@@ -21,14 +21,6 @@ const corsOptions = {
 app.use(cors(corsOptions))
 app.use(express.json())
 
-// Log every request (optional)
-app.use((req, res, next) => {
-  console.log("--- Incoming Request ---")
-  console.log("Method:", req.method)
-  console.log("URL:", req.originalUrl)
-  console.log("Origin:", req.headers.origin)
-  next()
-})
 
 app.get("/", (req, res) => {
   res.writeHead(200, { "Content-Type": "text/plain" });
