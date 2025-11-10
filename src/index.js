@@ -1,44 +1,39 @@
-const express = require('express')
-const cors = require('cors')
-const dotenv = require('dotenv')
-dotenv.config()
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+dotenv.config();
 
-const app = express()
+const app = express();
 
-// CORS FIRST
+// build allowed origins from env
 const allowedOrigins = process.env.CORS_ORIGIN
-  ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim())
-  : true
+  ? process.env.CORS_ORIGIN.split(",").map((o) => o.trim().replace(/\/$/, ""))
+  : true;
 
 const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no Origin (curl, mobile apps)
-    if (!origin) return callback(null, true)
-
-    // Normalize trailing slashes
-    const cleanOrigin = origin.replace(/\/$/, '')
-    const allowed = Array.isArray(allowedOrigins)
-      ? allowedOrigins.map((o) => o.replace(/\/$/, ''))
-      : allowedOrigins
-
-    if (allowed === true || allowed.includes(cleanOrigin)) {
-      callback(null, true)
-    } else {
-      console.log('Blocked CORS request from:', origin)
-      callback(new Error('Not allowed by CORS'))
-    }
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true); // allow tools/curl
+    const match =
+      allowedOrigins === true ||
+      allowedOrigins.includes(origin.replace(/\/$/, ""));
+    return match
+      ? cb(null, true)
+      : cb(new Error(`CORS blocked for ${origin}`));
   },
   credentials: true,
-  optionsSuccessStatus: 200
-}
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  optionsSuccessStatus: 204
+};
 
-app.use(cors(corsOptions))
-app.use(express.json())
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions)); // <— explicit preflight handler
+app.use(express.json());
 
-// ROUTES COME *AFTER* CORS
-app.use('/api/auth', require('./routers/authRouter'))
-app.use('/api/admin', require('./routers/adminRouter'))
-app.use('/api/admin', require('./routers/emailRouter'))
+// routes *after* CORS
+app.use("/api/auth", authRouter);
+app.use("/api/admin", adminRouter);
+app.use("/api/admin", emailRouter);
 
-const PORT = process.env.PORT || 3001
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => console.log(`Server running on ${PORT}`));
