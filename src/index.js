@@ -9,6 +9,26 @@ const emailRouter = require("./routers/emailRouter")
 dotenv.config()
 const app = express()
 
+process.on("uncaughtException", (err) => {
+  console.error("❌ Uncaught Exception:", err);
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("❌ Unhandled Rejection at:", promise, "reason:", reason);
+});
+
+process.on("SIGTERM", () => {
+  console.warn("⚠️ Received SIGTERM - process will be terminated soon.");
+});
+
+process.on("SIGINT", () => {
+  console.warn("⚠️ Received SIGINT - process interrupted manually.");
+});
+
+process.on("exit", (code) => {
+  console.log("⚙️ Process exiting with code:", code);
+});
+
 // CORS setup — must be FIRST
 const corsOptions = {
   origin: process.env.CORS_ORIGIN || "*",  // temporarily allow all if env missing
@@ -38,6 +58,10 @@ app.get("/", (req, res) => {
 app.use("/api/auth", authRouter)
 app.use("/api/admin", adminRouter)
 app.use("/api/admin", emailRouter)
+
+setInterval(() => {
+  console.log("💓 Heartbeat - server still alive", new Date().toISOString());
+}, 5000);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => console.log(`Server running on ${PORT}`));
