@@ -31,13 +31,12 @@ app.use((req, res, next) => {
 })
 
 app.get("/", (req, res) => {
-  res.send("OK");
+  res.status(200).send("OK");
 });
-
 // Routers after CORS
 app.use("/api/auth", authRouter)
 app.use("/api/admin", adminRouter)
 app.use("/api/admin", emailRouter)
 
-const PORT = process.env.PORT || 3001
-app.listen(PORT, "0.0.0.0", () => console.log(`Server running on ${PORT}`))
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, "0.0.0.0", () => console.log(`Server running on ${PORT}`));
