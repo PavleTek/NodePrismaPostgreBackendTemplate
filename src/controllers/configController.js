@@ -31,8 +31,7 @@ const getConfig = async (req, res) => {
         where: { id: config.recoveryEmailSenderId },
         select: {
           id: true,
-          email: true,
-          aliases: true
+          email: true
         }
       });
     }
@@ -168,8 +167,7 @@ const updateConfig = async (req, res) => {
         where: { id: config.recoveryEmailSenderId },
         select: {
           id: true,
-          email: true,
-          aliases: true
+          email: true
         }
       });
     }

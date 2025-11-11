@@ -46,17 +46,9 @@ model UserRole {
   @@unique([userId, roleId])
 }
 
-enum EmailProvider {
-  GMAIL
-  OUTLOOK
-}
-
 model EmailSender {
   id            Int           @id @default(autoincrement())
   email         String        @unique
-  emailProvider EmailProvider
-  refreshToken  String?
-  aliases       String[]      @default([])
   createdAt     DateTime      @default(now())
 }
 

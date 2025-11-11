@@ -6,7 +6,6 @@ const { sendEmail } = require('../services/emailService');
 
 // Login user
 const login = async (req, res) => {
-  console.log("login function is being called");
   try {
     const { username, password } = req.body;
 

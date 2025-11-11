@@ -40,17 +40,9 @@ The email system uses OAuth2 refresh tokens stored per email sender in the datab
 
 #### Required Environment Variables
 
-#### Gmail
-- `GMAIL_CLIENT_ID`: Gmail OAuth2 client ID (required)
-- `GMAIL_CLIENT_SECRET`: Gmail OAuth2 client secret (required)
+- `RESEND_API_KEY`: API key for the Resend email service.
 
-#### Outlook
-- `OUTLOOK_CLIENT_ID`: Outlook OAuth2 client ID (required)
-- `OUTLOOK_CLIENT_SECRET`: Outlook OAuth2 client secret (required)
-
-**Note**: 
-- Refresh tokens are stored per email sender in the database and must be added when creating or updating an email sender through the App Settings page in the frontend.
-- Each email sender can have its own refresh token, allowing multiple email accounts to send emails.
-- The refresh token is required when sending emails - if missing, an error will be thrown.
-- Make sure to add email senders and their refresh tokens through the App Settings page before sending emails.
+**Note**:
+- Email senders stored in the database only track the email address. Ensure those addresses are verified and allowed to send via Resend (configure domains/senders in the Resend dashboard).
+- At least one email sender must be created through the App Settings page before attempting to send emails from the application.
 

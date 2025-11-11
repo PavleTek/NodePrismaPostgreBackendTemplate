@@ -53,94 +53,34 @@ const getEmailById = async (req, res) => {
 // Create a new email sender
 const createEmail = async (req, res) => {
   try {
-    const { email, emailProvider, refreshToken, aliases } = req.body;
+    const { email } = req.body;
 
-    if (!email || !emailProvider) {
-      res.status(400).json({ error: 'Email and emailProvider are required' });
+    if (!email) {
+      res.status(400).json({ error: 'Email is required' });
       return;
     }
 
-    if (!['GMAIL', 'OUTLOOK'].includes(emailProvider.toUpperCase())) {
-      res.status(400).json({ error: 'emailProvider must be either GMAIL or OUTLOOK' });
-      return;
-    }
-
-    // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       res.status(400).json({ error: 'Invalid email format' });
       return;
     }
 
-    const createData = {
-      email: email.toLowerCase().trim(),
-      emailProvider: emailProvider.toUpperCase(),
-    };
+    const normalizedEmail = email.toLowerCase().trim();
 
-    // Add refreshToken if provided
-    if (refreshToken) {
-      createData.refreshToken = refreshToken.trim();
-    }
+    const existingEmail = await prisma.emailSender.findUnique({
+      where: { email: normalizedEmail },
+    });
 
-    // Validate and process aliases
-    if (aliases && Array.isArray(aliases)) {
-      const normalizedAliases = [];
-      const seenAliases = new Set();
-
-      for (const alias of aliases) {
-        if (!alias || typeof alias !== 'string') {
-          continue;
-        }
-
-        const normalizedAlias = alias.toLowerCase().trim();
-
-        // Validate email format
-        if (!emailRegex.test(normalizedAlias)) {
-          res.status(400).json({ error: `Invalid alias email format: ${alias}` });
-          return;
-        }
-
-        // Check for duplicates within the array
-        if (seenAliases.has(normalizedAlias)) {
-          res.status(400).json({ error: `Duplicate alias: ${normalizedAlias}` });
-          return;
-        }
-
-        // Check if alias matches the main email
-        if (normalizedAlias === createData.email) {
-          res.status(400).json({ error: 'Alias cannot be the same as the main email' });
-          return;
-        }
-
-        seenAliases.add(normalizedAlias);
-        normalizedAliases.push(normalizedAlias);
-      }
-
-      // Check if aliases conflict with existing email senders
-      if (normalizedAliases.length > 0) {
-        const existingSenders = await prisma.emailSender.findMany({
-          where: {
-            OR: [
-              { email: { in: normalizedAliases } },
-              { aliases: { hasSome: normalizedAliases } }
-            ]
-          }
-        });
-
-        if (existingSenders.length > 0) {
-          const conflictingEmails = existingSenders.map(s => s.email).join(', ');
-          res.status(409).json({ 
-            error: `Aliases conflict with existing email sender(s): ${conflictingEmails}` 
-          });
-          return;
-        }
-      }
-
-      createData.aliases = normalizedAliases;
+    if (existingEmail) {
+      res.status(409).json({ error: 'Email already exists' });
+      return;
     }
 
     const newEmail = await prisma.emailSender.create({
-      data: createData,
+      data: {
+        email: normalizedEmail,
+      },
     });
 
     res.status(201).json({
@@ -162,15 +102,15 @@ const updateEmail = async (req, res) => {
   try {
     const { id } = req.params;
     const emailId = parseInt(id);
-    const { email, emailProvider, refreshToken, aliases } = req.body;
+    const { email } = req.body;
 
     if (isNaN(emailId)) {
       res.status(400).json({ error: 'Invalid email ID' });
       return;
     }
 
-    if (!email && !emailProvider && refreshToken === undefined && aliases === undefined) {
-      res.status(400).json({ error: 'At least one field (email, emailProvider, refreshToken, or aliases) is required' });
+    if (!email) {
+      res.status(400).json({ error: 'Email is required' });
       return;
     }
 
@@ -188,7 +128,6 @@ const updateEmail = async (req, res) => {
     const updateData = {};
 
     if (email) {
-      // Basic email validation
       if (!emailRegex.test(email)) {
         res.status(400).json({ error: 'Invalid email format' });
         return;
@@ -196,85 +135,13 @@ const updateEmail = async (req, res) => {
       updateData.email = email.toLowerCase().trim();
     }
 
-    if (emailProvider) {
-      if (!['GMAIL', 'OUTLOOK'].includes(emailProvider.toUpperCase())) {
-        res.status(400).json({ error: 'emailProvider must be either GMAIL or OUTLOOK' });
-        return;
-      }
-      updateData.emailProvider = emailProvider.toUpperCase();
-    }
+    const existingEmail = await prisma.emailSender.findUnique({
+      where: { email: updateData.email },
+    });
 
-    if (refreshToken !== undefined) {
-      // Allow setting refreshToken to null/empty string to clear it
-      updateData.refreshToken = refreshToken ? refreshToken.trim() : null;
-    }
-
-    // Validate and process aliases
-    if (aliases !== undefined) {
-      if (!Array.isArray(aliases)) {
-        res.status(400).json({ error: 'Aliases must be an array' });
-        return;
-      }
-
-      const normalizedAliases = [];
-      const seenAliases = new Set();
-      const mainEmail = updateData.email || currentEmailSender.email;
-
-      for (const alias of aliases) {
-        if (!alias || typeof alias !== 'string') {
-          continue;
-        }
-
-        const normalizedAlias = alias.toLowerCase().trim();
-
-        // Validate email format
-        if (!emailRegex.test(normalizedAlias)) {
-          res.status(400).json({ error: `Invalid alias email format: ${alias}` });
-          return;
-        }
-
-        // Check for duplicates within the array
-        if (seenAliases.has(normalizedAlias)) {
-          res.status(400).json({ error: `Duplicate alias: ${normalizedAlias}` });
-          return;
-        }
-
-        // Check if alias matches the main email
-        if (normalizedAlias === mainEmail) {
-          res.status(400).json({ error: 'Alias cannot be the same as the main email' });
-          return;
-        }
-
-        seenAliases.add(normalizedAlias);
-        normalizedAliases.push(normalizedAlias);
-      }
-
-      // Check if aliases conflict with existing email senders (excluding current one)
-      if (normalizedAliases.length > 0) {
-        const existingSenders = await prisma.emailSender.findMany({
-          where: {
-            AND: [
-              { id: { not: emailId } },
-              {
-                OR: [
-                  { email: { in: normalizedAliases } },
-                  { aliases: { hasSome: normalizedAliases } }
-                ]
-              }
-            ]
-          }
-        });
-
-        if (existingSenders.length > 0) {
-          const conflictingEmails = existingSenders.map(s => s.email).join(', ');
-          res.status(409).json({ 
-            error: `Aliases conflict with existing email sender(s): ${conflictingEmails}` 
-          });
-          return;
-        }
-      }
-
-      updateData.aliases = normalizedAliases;
+    if (existingEmail && existingEmail.id !== emailId) {
+      res.status(409).json({ error: 'Email already exists' });
+      return;
     }
 
     const updatedEmail = await prisma.emailSender.update({
@@ -367,10 +234,6 @@ const deleteEmail = async (req, res) => {
 
 // Send test email (debug version)
 const sendTestEmail = async (req, res) => {
-  console.log("📩 [sendTestEmail] Request received");
-  console.log("Headers:", req.headers);
-  console.log("Body:", req.body);
-  console.log("Files:", req.files);
 
   try {
     const { fromEmail, toEmails, ccEmails, bccEmails, subject, content } = req.body;
@@ -387,11 +250,9 @@ const sendTestEmail = async (req, res) => {
       if (typeof emails === 'string') {
         try {
           const parsed = JSON.parse(emails);
-          console.log("✅ Parsed JSON emails for", emails, "=>", parsed);
           return Array.isArray(parsed) ? parsed : [parsed];
         } catch {
           const split = emails.split(',').map(e => e.trim()).filter(e => e);
-          console.log("✅ Parsed comma-separated emails for", emails, "=>", split);
           return split;
         }
       }
@@ -401,12 +262,6 @@ const sendTestEmail = async (req, res) => {
     const toEmailsArray = parseEmailArray(toEmails);
     const ccEmailsArray = parseEmailArray(ccEmails);
     const bccEmailsArray = parseEmailArray(bccEmails);
-
-    console.log("Parsed recipients:", {
-      toEmailsArray,
-      ccEmailsArray,
-      bccEmailsArray
-    });
 
     if (toEmailsArray.length === 0) {
       console.warn("⚠️ No recipients found");
@@ -439,9 +294,7 @@ const sendTestEmail = async (req, res) => {
 
     const attachments = [];
     if (req.files && req.files.length > 0) {
-      console.log("📎 Processing attachments...");
       for (const file of req.files) {
-        console.log(" - Found file:", file.originalname, file.mimetype, file.size);
         attachments.push({
           filename: file.originalname,
           content: file.buffer,
@@ -449,7 +302,6 @@ const sendTestEmail = async (req, res) => {
         });
       }
     } else {
-      console.log("📎 No attachments found");
     }
 
     const emailOptions = {
@@ -463,11 +315,7 @@ const sendTestEmail = async (req, res) => {
       attachments: attachments.length > 0 ? attachments : undefined,
     };
 
-    console.log("📨 Sending email with options:", emailOptions);
-
     const result = await sendEmail(emailOptions);
-
-    console.log("✅ Email sent successfully. Result:", result);
 
     res.status(200).json({
       message: 'Test email sent successfully',
