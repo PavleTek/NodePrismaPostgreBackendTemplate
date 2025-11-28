@@ -6,42 +6,45 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Starting database seeding...');
 
-  // Create roles (check if they exist first)
-  console.log('📝 Creating roles...');
-  const roleNames = ['admin', 'manager', 'operator', 'salesperson', 'accountant'];
-  const roles = [];
-  const createdRoles = [];
-  const existingRoles = [];
+  // Check if any users exist in the database
+  const existingUserCount = await prisma.user.count();
+  if (existingUserCount > 0) {
+    console.log(`ℹ️  Database already contains ${existingUserCount} user(s). Skipping user creation.`);
+    console.log('🎉 Database seeding completed successfully!');
+    console.log('\n📋 Summary:');
+    console.log(`  - Users already exist in database (${existingUserCount} user(s))`);
+    return;
+  }
 
-  for (const roleName of roleNames) {
-    const existingRole = await prisma.role.findUnique({
-      where: { name: roleName }
-    });
+  // Check if any roles exist in the database
+  const existingRoleCount = await prisma.role.count();
+  let roles;
+  
+  if (existingRoleCount > 0) {
+    console.log(`ℹ️  Database already contains ${existingRoleCount} role(s). Skipping role creation.`);
+    // Still need to fetch existing roles for user creation
+    roles = await prisma.role.findMany();
+    console.log(`  Using existing roles: ${roles.map(r => r.name).join(', ')}`);
+  } else {
+    // Create roles (only if none exist)
+    console.log('📝 Creating roles...');
+    const roleNames = ['admin', 'manager', 'operator', 'salesperson', 'accountant'];
+    roles = [];
 
-    if (existingRole) {
-      roles.push(existingRole);
-      existingRoles.push(roleName);
-    } else {
+    for (const roleName of roleNames) {
       const newRole = await prisma.role.create({
         data: { name: roleName }
       });
       roles.push(newRole);
-      createdRoles.push(roleName);
       console.log(`  ✅ Role "${roleName}" created`);
     }
-  }
-
-  if (createdRoles.length > 0) {
-    console.log(`✅ Created ${createdRoles.length} new role(s): ${createdRoles.join(', ')}`);
-  }
-  if (existingRoles.length === roleNames.length) {
-    console.log(`ℹ️  Roles already initialized`);
+    console.log(`✅ Created ${roles.length} new role(s): ${roleNames.join(', ')}`);
   }
 
   // Hash password for all users
   const hashedPassword = await bcrypt.hash('asdf', 12);
 
-  // Create users with individual roles (check if they exist first)
+  // Create users with individual roles
   console.log('👥 Creating users...');
   
   const userDefinitions = [
@@ -95,80 +98,40 @@ async function main() {
     }
   ];
 
-  const users = [];
   const createdUsers = [];
-  const existingUsers = [];
 
   for (const userDef of userDefinitions) {
-    // Check if user exists by email or username
-    const existingUser = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { email: userDef.email },
-          { username: userDef.username }
-        ]
-      },
-      include: {
-        userRoles: {
-          include: {
-            role: true
-          }
-        }
+    const userData = {
+      email: userDef.email,
+      username: userDef.username,
+      hashedPassword,
+      name: userDef.name,
+      lastName: userDef.lastName,
+      userRoles: {
+        create: userDef.roleIndex === null
+          ? roles.map(role => ({ roleId: role.id }))
+          : [{ roleId: roles[userDef.roleIndex].id }]
       }
+    };
+
+    const newUser = await prisma.user.create({
+      data: userData
     });
-
-    if (existingUser) {
-      users.push(existingUser);
-      existingUsers.push(userDef.username);
-    } else {
-      const userData = {
-        email: userDef.email,
-        username: userDef.username,
-        hashedPassword,
-        name: userDef.name,
-        lastName: userDef.lastName,
-        userRoles: {
-          create: userDef.roleIndex === null
-            ? roles.map(role => ({ roleId: role.id }))
-            : [{ roleId: roles[userDef.roleIndex].id }]
-        }
-      };
-
-      const newUser = await prisma.user.create({
-        data: userData
-      });
-      users.push(newUser);
-      createdUsers.push(userDef.username);
-      console.log(`  ✅ User "${userDef.username}" (${userDef.email}) created with ${userDef.roleName} role(s)`);
-    }
+    createdUsers.push(userDef.username);
+    console.log(`  ✅ User "${userDef.username}" (${userDef.email}) created with ${userDef.roleName} role(s)`);
   }
 
-  if (createdUsers.length > 0) {
-    console.log(`✅ Created ${createdUsers.length} new user(s): ${createdUsers.join(', ')}`);
-  }
-  if (existingUsers.length === userDefinitions.length) {
-    console.log(`ℹ️  Users already initialized`);
-  }
+  console.log(`✅ Created ${createdUsers.length} new user(s): ${createdUsers.join(', ')}`);
 
   console.log('🎉 Database seeding completed successfully!');
   console.log('\n📋 Summary:');
-  if (createdRoles.length > 0) {
-    console.log(`  - ${createdRoles.length} new role(s) created`);
+  if (existingRoleCount === 0) {
+    console.log(`  - ${roles.length} new role(s) created`);
+  } else {
+    console.log(`  - Used existing roles (${existingRoleCount} role(s) already existed)`);
   }
-  if (existingRoles.length === roleNames.length) {
-    console.log(`  - Roles already initialized`);
-  }
-  if (createdUsers.length > 0) {
-    console.log(`  - ${createdUsers.length} new user(s) created`);
-    console.log('  - All new users have password: "asdf"');
-  }
-  if (existingUsers.length === userDefinitions.length) {
-    console.log(`  - Users already initialized`);
-  }
-  console.log(`  - Configuration ${existingConfig ? 'already existed' : 'initialized'}`);
-  if (createdUsers.length > 0) {
-    console.log('  - Super admin has all roles');
-  }
+  console.log(`  - ${createdUsers.length} new user(s) created`);
+  console.log('  - All new users have password: "asdf"');
 }
 
 main()
