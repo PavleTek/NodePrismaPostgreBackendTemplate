@@ -65,3 +65,29 @@ model Configuration {
   recoveryEmailSenderId   Int?
   updatedAt               DateTime  @updatedAt
 }
+
+model Country {
+  id        Int     @id @default(autoincrement())
+  name      String
+  code      String  @unique
+  important Boolean @default(false)
+}
+
+model Currency {
+  id            Int     @id @default(autoincrement())
+  code          String  @unique
+  name          String
+  symbol        String
+  symbolNative  String
+  decimalDigits Int
+  rounding      Float
+  namePlural    String
+  important     Boolean @default(false)
+}
+
+model Language {
+  id        Int     @id @default(autoincrement())
+  code      String  @unique
+  name      String
+  important Boolean @default(false)
+}
