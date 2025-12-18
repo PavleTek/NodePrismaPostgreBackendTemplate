@@ -63,7 +63,23 @@ model Configuration {
   twoFactorEnabled        Boolean   @default(false)
   appName                 String    @default("PavleTek")
   recoveryEmailSenderId   Int?
+  mantenedoresVersion     Int       @default(0)
   updatedAt               DateTime  @updatedAt
+}
+
+// Single table for all mantenedores (admin metadata)
+// Type is a plain string - no enum constraint for flexible development
+// All type definitions live in the frontend (types/mantenedores.ts)
+model Mantenedor {
+  id        Int      @id @default(autoincrement())
+  type      String   // Flexible: any type string is allowed
+  name      String
+  data      Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type])
+  @@index([type, name])
 }
 
 model Country {

@@ -7,6 +7,7 @@ const adminRouter = require("./routers/adminRouter");
 const emailRouter = require("./routers/emailRouter");
 const domainRouter = require("./routers/domainRouter");
 const referenceDataRouter = require("./routers/referenceDataRouter");
+const mantenedorRouter = require("./routers/mantenedorRouter");
 
 dotenv.config();
 const app = express();
@@ -50,6 +51,7 @@ app.use("/api/admin", adminRouter);
 app.use("/api/admin", emailRouter);
 app.use("/api/admin", domainRouter);
 app.use("/api/admin", referenceDataRouter);
+app.use("/api", mantenedorRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => console.log(`server running on ${PORT}`));
